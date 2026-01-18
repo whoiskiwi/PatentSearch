@@ -1,0 +1,3 @@
+"""
+Thinkstruct Patent Search Backend
+"""
