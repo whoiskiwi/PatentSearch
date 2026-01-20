@@ -2,6 +2,8 @@
 
 A semantic search engine for US patents, supporting invalidity search, infringement monitoring, and patentability assessment.
 
+**Last Updated:** January 20, 2026
+
 ## Features
 
 - **Semantic Search**: AI-powered similarity matching using patent-specific NLP models
@@ -9,6 +11,8 @@ A semantic search engine for US patents, supporting invalidity search, infringem
   - **Invalidity Search**: Find prior art that may invalidate a target patent
   - **Infringement Monitoring**: Monitor new patents for potential infringement risks
   - **Patentability Assessment**: Assess patentability of new inventions
+- **Google OAuth Authentication**: Secure login with Google accounts
+- **Search History**: Save and retrieve past searches with full results
 - **Advanced Filtering**: Classification codes (IPC/CPC), keywords, date ranges
 - **Risk Assessment**: Automatic risk level calculation for infringement monitoring
 - **Novelty Assessment**: Automatic novelty evaluation for patentability review
@@ -21,10 +25,19 @@ A semantic search engine for US patents, supporting invalidity search, infringem
 - **Sentence-Transformers** - Semantic embedding generation
 - **NumPy** - Vector similarity computation
 
+### Database
+- **PostgreSQL** - Production database for user data and search history
+- **SQLite** - Development database (optional)
+- **Redis** - Session caching (optional, recommended for production)
+
 ### Frontend
 - **React 18** + TypeScript
 - **Vite** - Build tool
 - **Axios** - HTTP client
+
+### Authentication
+- **Google OAuth 2.0** - User authentication
+- **JWT** - Session management
 
 ### Semantic Search Model
 
@@ -45,35 +58,13 @@ PatentSBERTa is a Sentence-BERT model fine-tuned specifically for patent text, t
 > Technological Forecasting and Social Change, 206, 123536.
 > [DOI: 10.1016/j.techfore.2024.123536](https://doi.org/10.1016/j.techfore.2024.123536)
 
-**Model Installation:**
-
-The model will be downloaded automatically on first run. To pre-download manually:
-
-```python
-from sentence_transformers import SentenceTransformer
-
-# Download PatentSBERTa_V2 (~420MB)
-model = SentenceTransformer('AAUBS/PatentSBERTa_V2')
-```
-
-Or using Hugging Face CLI:
-
-```bash
-# Install huggingface_hub if not installed
-pip install huggingface_hub
-
-# Download model to cache
-huggingface-cli download AAUBS/PatentSBERTa_V2
-```
-
-The model is cached locally at `~/.cache/huggingface/hub/` after download.
-
 ## Installation
 
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- npm or yarn
+- PostgreSQL 14+ (for production)
+- Redis (optional, for caching)
 
 ### Backend Setup
 
@@ -84,11 +75,94 @@ pip install -r requirements.txt
 # The model (~420MB) will be downloaded automatically on first run
 ```
 
+### Database Setup
+
+#### Option 1: PostgreSQL (Recommended for Production)
+
+```bash
+# Install PostgreSQL (macOS)
+brew install postgresql@14
+brew services start postgresql@14
+
+# Create database
+createdb thinkstruct
+
+# Configure environment variables in .env
+DATABASE_TYPE=postgresql
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=thinkstruct
+PG_USER=postgres
+PG_PASSWORD=your_password
+```
+
+#### Option 2: SQLite (Development)
+
+```bash
+# No setup required, just configure .env
+DATABASE_TYPE=sqlite
+DATABASE_PATH=./backend/thinkstruct.db
+```
+
+### Google OAuth Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Google+ API
+4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
+5. Set authorized redirect URI: `http://localhost:5000/api/auth/callback/google`
+6. Copy Client ID and Client Secret to `.env`:
+
+```bash
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/callback/google
+```
+
 ### Frontend Setup
 
 ```bash
 cd frontend
 npm install
+```
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/callback/google
+
+# JWT Configuration
+JWT_SECRET=your-secret-key-change-in-production
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+
+# Frontend URL
+FRONTEND_URL=http://localhost:3000
+
+# Database Configuration
+DATABASE_TYPE=postgresql  # or "sqlite"
+
+# PostgreSQL (when DATABASE_TYPE=postgresql)
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=thinkstruct
+PG_USER=postgres
+PG_PASSWORD=your_password
+
+# SQLite (when DATABASE_TYPE=sqlite)
+DATABASE_PATH=./backend/thinkstruct.db
+
+# Redis Cache (Optional)
+REDIS_ENABLED=false
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 ## Running the Application
@@ -99,6 +173,12 @@ npm install
 # From project root
 python run.py
 # Server runs on http://localhost:5000
+```
+
+Or using uvicorn directly:
+
+```bash
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
 ```
 
 ### Start Frontend Dev Server
@@ -118,6 +198,8 @@ npm run build
 
 ## API Endpoints
 
+### Core Search APIs
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
@@ -125,6 +207,24 @@ npm run build
 | POST | `/api/search/invalidity` | Invalidity search - find prior art |
 | POST | `/api/search/infringement` | Infringement monitoring - detect risks |
 | POST | `/api/search/patentability` | Patentability assessment - evaluate novelty |
+
+### Authentication APIs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/login/google` | Initiate Google OAuth login |
+| GET | `/api/auth/callback/google` | OAuth callback handler |
+| GET | `/api/auth/status` | Check authentication status |
+| POST | `/api/auth/logout` | Logout current user |
+
+### Search History APIs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/history` | Get user's search history |
+| GET | `/api/history/{id}` | Get specific history entry |
+| DELETE | `/api/history/{id}` | Delete history entry |
+| DELETE | `/api/history` | Clear all history |
 
 ---
 
@@ -232,6 +332,45 @@ POST /api/search/patentability
 
 ---
 
+## Database Schema
+
+### Users Table
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    google_id TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    picture_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Sessions Table
+```sql
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL,
+    is_revoked BOOLEAN DEFAULT FALSE
+);
+```
+
+### Search History Table
+```sql
+CREATE TABLE search_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scenario TEXT NOT NULL,
+    query_data JSONB NOT NULL,
+    results_data JSONB,
+    result_count INTEGER DEFAULT 0,
+    search_time_ms REAL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ## Project Structure
 
 ```
@@ -242,46 +381,54 @@ Thinkstruct/
 │   ├── main.py                     # FastAPI app entry + CORS config
 │   ├── models.py                   # Pydantic request/response models
 │   ├── dependencies.py             # Dependency injection (search engine instance)
+│   ├── auth/                       # Authentication module
+│   │   ├── __init__.py
+│   │   ├── config.py               # Settings and configuration
+│   │   ├── database.py             # Database interface (SQLite/PostgreSQL)
+│   │   ├── cache.py                # Redis cache layer
+│   │   ├── models.py               # Auth-related Pydantic models
+│   │   ├── jwt_handler.py          # JWT token management
+│   │   ├── oauth.py                # Google OAuth implementation
+│   │   └── dependencies.py         # Auth dependencies
 │   ├── routers/                    # API router layer
 │   │   ├── __init__.py
+│   │   ├── auth.py                 # Authentication endpoints
+│   │   ├── history.py              # Search history endpoints
 │   │   ├── invalidity.py           # POST /api/search/invalidity
 │   │   ├── infringement.py         # POST /api/search/infringement
 │   │   ├── patentability.py        # POST /api/search/patentability
 │   │   └── stats.py                # GET /api/stats, GET /api/health
 │   └── services/                   # Business logic layer
 │       ├── __init__.py
-│       └── search_engine.py        # Core search engine (semantic search + filtering)
+│       └── search_engine.py        # Core search engine
 │
 ├── frontend/                       # Frontend React/TypeScript
 │   ├── src/
 │   │   ├── api/
-│   │   │   └── searchApi.ts        # API client + type definitions
+│   │   │   ├── searchApi.ts        # Search API client
+│   │   │   └── historyApi.ts       # History API client
+│   │   ├── auth/                   # Authentication module
+│   │   │   ├── AuthContext.tsx     # Auth context provider
+│   │   │   ├── authApi.ts          # Auth API client
+│   │   │   └── index.ts
 │   │   ├── components/             # UI components
-│   │   │   ├── Sidebar/            # Sidebar (scenario selection + filters)
-│   │   │   │   ├── Sidebar.tsx
-│   │   │   │   ├── Sidebar.css
-│   │   │   │   └── index.ts
-│   │   │   ├── SearchForm/         # Search forms (scenario-specific)
-│   │   │   │   ├── InvalidityForm.tsx
-│   │   │   │   ├── InfringementForm.tsx
-│   │   │   │   ├── PatentabilityForm.tsx
-│   │   │   │   ├── SearchForm.css
-│   │   │   │   └── index.ts
-│   │   │   └── ResultCard/         # Result cards (scenario-specific)
-│   │   │       ├── InvalidityCard.tsx
-│   │   │       ├── InfringementCard.tsx
-│   │   │       ├── PatentabilityCard.tsx
-│   │   │       ├── ResultCard.css
-│   │   │       └── index.ts
-│   │   ├── hooks/                  # Custom React Hooks
-│   │   │   ├── useSearch.ts        # Search logic + state management + color utilities
-│   │   │   └── useResizableSidebar.ts  # Resizable sidebar hook
+│   │   │   ├── Sidebar/
+│   │   │   ├── SearchForm/
+│   │   │   ├── ResultCard/
+│   │   │   └── Auth/               # Auth components (LoginButton, UserMenu)
+│   │   ├── pages/                  # Page components
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── HistoryPage.tsx
+│   │   │   └── index.ts
+│   │   ├── hooks/
+│   │   │   ├── useSearch.ts
+│   │   │   └── useResizableSidebar.ts
 │   │   ├── types/
-│   │   │   └── index.ts            # Shared type definitions + constants
-│   │   ├── App.tsx                 # Main component
-│   │   ├── App.css                 # Global styles
-│   │   ├── main.tsx                # React entry
-│   │   └── index.css               # Base styles
+│   │   │   └── index.ts
+│   │   ├── App.tsx
+│   │   ├── App.css
+│   │   ├── main.tsx
+│   │   └── index.css
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
@@ -289,13 +436,14 @@ Thinkstruct/
 ├── data/                           # Data directory
 │   ├── __init__.py
 │   ├── clean_patent_data.py        # Data cleaning script
-│   ├── patent_data_small/          # Raw patent data (patents_ipa*.json)
+│   ├── patent_data_small/          # Raw patent data
 │   └── cleaned_output/             # Cleaned data + reports
 │
 ├── docs/                           # Documentation
 │   ├── advanced_features.md        # Advanced features roadmap
 │   └── data_cleaning_guide.md      # Data cleaning guide
 │
+├── .env                            # Environment variables (not in git)
 ├── run.py                          # Backend entry point
 ├── requirements.txt                # Python dependencies
 └── README.md
@@ -321,20 +469,24 @@ Thinkstruct/
 │                      Backend (FastAPI)                          │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                      Routers                             │   │
-│  │  /invalidity  │  /infringement  │  /patentability       │   │
+│  │  /auth  │  /history  │  /invalidity  │  /infringement   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                            │                                    │
-│                    ┌───────┴───────┐                           │
-│                    │ SearchEngine  │  (services)                │
-│                    │ PatentSBERTa  │                           │
-│                    └───────────────┘                           │
+│         ┌──────────────────┼──────────────────┐                │
+│         ▼                  ▼                  ▼                 │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐          │
+│  │  AuthModule │   │SearchEngine │   │  Database   │          │
+│  │   (OAuth)   │   │(PatentSBERTa)│   │ (PostgreSQL)│          │
+│  └─────────────┘   └─────────────┘   └─────────────┘          │
 └────────────────────────────┬────────────────────────────────────┘
                              │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         Data Layer                              │
-│              cleaned_output/patents_cleaned_*.json              │
-└─────────────────────────────────────────────────────────────────┘
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+┌─────────────────┐ ┌─────────────┐ ┌─────────────┐
+│   Patent Data   │ │  PostgreSQL │ │    Redis    │
+│  (JSON files)   │ │  (users,    │ │  (cache)    │
+│                 │ │   history)  │ │             │
+└─────────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## Data Preprocessing
@@ -364,4 +516,4 @@ See [Data Cleaning Guide](docs/data_cleaning_guide.md) for details.
 
 ## License
 
-MIT
+MIT License

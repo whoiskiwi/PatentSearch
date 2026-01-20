@@ -2,11 +2,44 @@
 
 ## Overview
 
-This document records advanced features to be implemented in future versions of the Thinkstruct patent search system, primarily involving fields that are currently missing from the database but are critical for search functionality.
+This document records advanced features implemented and planned for future versions of the Thinkstruct patent search system.
 
 ---
 
-## Current Database Fields
+## Recently Implemented Features (January 2026)
+
+### User Authentication & Session Management ✅
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Google OAuth 2.0 | ✅ Implemented | Secure user authentication via Google accounts |
+| JWT Sessions | ✅ Implemented | Token-based session management with 24-hour expiry |
+| Guest Mode | ✅ Implemented | Allow anonymous users to search without login |
+
+### Search History ✅
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Save Search History | ✅ Implemented | Automatically save search queries and results |
+| View History | ✅ Implemented | Browse past searches with timestamps |
+| Restore Results | ✅ Implemented | Click history entry to view full results |
+| Delete History | ✅ Implemented | Remove individual or all history entries |
+
+### Database Architecture ✅
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| PostgreSQL Support | ✅ Implemented | Production-ready database for 100+ concurrent users |
+| SQLite Support | ✅ Implemented | Lightweight option for development |
+| Connection Pooling | ✅ Implemented | Efficient connection management (5-20 connections) |
+| Redis Cache | ✅ Implemented | Optional session and data caching |
+| Migration Script | ✅ Implemented | SQLite to PostgreSQL data migration |
+
+---
+
+## Patent Data Fields
+
+### Current Database Fields
 
 | Field Name | Type | Description | Status |
 |------------|------|-------------|--------|
@@ -281,5 +314,5 @@ class PatentRecord:
 
 ---
 
-*Document Version: 1.1*
-*Last Updated: 2026-01-17*
+*Document Version: 2.0*
+*Last Updated: 2026-01-20*
