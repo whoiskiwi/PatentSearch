@@ -2,6 +2,7 @@
 Invalidity Search Router
 """
 
+import time
 from fastapi import APIRouter, HTTPException, Depends
 
 from ..models import (
@@ -18,10 +19,14 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 async def invalidity_search(request: InvaliditySearchRequest, engine=Depends(get_engine)):
     """Invalidity search - Find prior art earlier than target patent"""
     try:
+        start_time = time.perf_counter()
+
         results = engine.invalidity_search(
             query_claims=request.query_claims,
             query_doc_number=request.query_doc_number,
             classification=request.classification,
+            keywords=request.keywords,
+            title_search=request.title_search,
             target_date=request.target_date,
             top_k=request.top_k
         )
@@ -43,10 +48,13 @@ async def invalidity_search(request: InvaliditySearchRequest, engine=Depends(get
             for r in results
         ]
 
+        search_time_ms = (time.perf_counter() - start_time) * 1000
+
         return InvaliditySearchResponse(
             success=True,
             total=len(result_items),
-            results=result_items
+            results=result_items,
+            search_time_ms=round(search_time_ms, 2)
         )
 
     except Exception as e:

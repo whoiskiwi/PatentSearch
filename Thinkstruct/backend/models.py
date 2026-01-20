@@ -15,6 +15,8 @@ class InvaliditySearchRequest(BaseModel):
     query_claims: str = Field(..., min_length=1, description="Target patent claims")
     query_doc_number: str = Field(default="", description="Target patent number")
     classification: str = Field(default="", description="Classification code prefix")
+    keywords: list[str] = Field(default=[], description="Key technical terms")
+    title_search: str = Field(default="", description="Search in patent title")
     target_date: Optional[str] = Field(default=None, description="Target patent date YYYY-MM-DD")
     top_k: int = Field(default=20, ge=1, le=100, description="Number of results to return")
 
@@ -25,6 +27,7 @@ class InfringementSearchRequest(BaseModel):
     my_doc_number: str = Field(..., min_length=1, description="Your patent number")
     classification: str = Field(default="", description="Classification code prefix")
     keywords: list[str] = Field(default=[], description="Key technical terms")
+    title_search: str = Field(default="", description="Search in patent title")
     date_from: Optional[str] = Field(default=None, description="Monitoring start date YYYY-MM-DD")
     date_to: Optional[str] = Field(default=None, description="Monitoring end date YYYY-MM-DD")
     min_similarity: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum similarity threshold")
@@ -37,6 +40,14 @@ class PatentabilitySearchRequest(BaseModel):
     draft_claims: str = Field(default="", description="Draft claims")
     classification: str = Field(default="", description="Estimated classification code")
     keywords: list[str] = Field(default=[], description="Core technical terms")
+    title_search: str = Field(default="", description="Search in patent title")
+    top_k: int = Field(default=20, ge=1, le=100, description="Number of results to return")
+
+
+class PatentIdSearchRequest(BaseModel):
+    """Patent ID search request"""
+    doc_number: str = Field(..., min_length=1, description="Patent document number to search")
+    classification: str = Field(default="", description="Classification code prefix filter")
     top_k: int = Field(default=20, ge=1, le=100, description="Number of results to return")
 
 
@@ -97,6 +108,7 @@ class InvaliditySearchResponse(BaseModel):
     total: int
     results: list[InvalidityResultItem]
     scenario: str = "invalidity"
+    search_time_ms: float = Field(default=0, description="Search time in milliseconds")
 
 
 class InfringementSearchResponse(BaseModel):
@@ -105,6 +117,7 @@ class InfringementSearchResponse(BaseModel):
     total: int
     results: list[InfringementResultItem]
     scenario: str = "infringement"
+    search_time_ms: float = Field(default=0, description="Search time in milliseconds")
 
 
 class PatentabilitySearchResponse(BaseModel):
@@ -113,6 +126,40 @@ class PatentabilitySearchResponse(BaseModel):
     total: int
     results: list[PatentabilityResultItem]
     scenario: str = "patentability"
+    search_time_ms: float = Field(default=0, description="Search time in milliseconds")
+
+
+class PatentIdResultItem(BaseModel):
+    """Patent ID search result item"""
+    doc_number: str
+    title: str
+    abstract: str
+    classification: str
+    publication_date: str
+    similarity_score: float
+    matched_claims: list[str]
+    all_claims: list[str]
+    detailed_description: str
+
+
+class SourcePatentInfo(BaseModel):
+    """Source patent information"""
+    doc_number: str
+    title: str
+    abstract: str
+    classification: str
+    publication_date: str
+    claims: list[str]
+
+
+class PatentIdSearchResponse(BaseModel):
+    """Patent ID search response"""
+    success: bool
+    source_patent: Optional[SourcePatentInfo] = None
+    total: int
+    results: list[PatentIdResultItem]
+    scenario: str = "patent_id"
+    search_time_ms: float = Field(default=0, description="Search time in milliseconds")
 
 
 class StatsResponse(BaseModel):

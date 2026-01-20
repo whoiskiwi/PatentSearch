@@ -3,13 +3,15 @@ import axios from 'axios';
 const API_BASE = '/api';
 
 // ============================================================================
-// 请求类型 - 按场景区分
+// Request Types - By Scenario
 // ============================================================================
 
 export interface InvaliditySearchRequest {
   query_claims: string;
   query_doc_number?: string;
   classification?: string;
+  keywords?: string[];
+  title_search?: string;
   target_date?: string;
   top_k?: number;
 }
@@ -19,6 +21,7 @@ export interface InfringementSearchRequest {
   my_doc_number: string;
   classification?: string;
   keywords?: string[];
+  title_search?: string;
   date_from?: string;
   date_to?: string;
   min_similarity?: number;
@@ -30,11 +33,18 @@ export interface PatentabilitySearchRequest {
   draft_claims?: string;
   classification?: string;
   keywords?: string[];
+  title_search?: string;
+  top_k?: number;
+}
+
+export interface PatentIdSearchRequest {
+  doc_number: string;
+  classification?: string;
   top_k?: number;
 }
 
 // ============================================================================
-// 响应类型 - 按场景区分
+// Response Types - By Scenario
 // ============================================================================
 
 export interface InvalidityResultItem {
@@ -86,6 +96,7 @@ export interface InvaliditySearchResponse {
   total: number;
   results: InvalidityResultItem[];
   scenario: 'invalidity';
+  search_time_ms: number;
 }
 
 export interface InfringementSearchResponse {
@@ -93,6 +104,7 @@ export interface InfringementSearchResponse {
   total: number;
   results: InfringementResultItem[];
   scenario: 'infringement';
+  search_time_ms: number;
 }
 
 export interface PatentabilitySearchResponse {
@@ -100,6 +112,37 @@ export interface PatentabilitySearchResponse {
   total: number;
   results: PatentabilityResultItem[];
   scenario: 'patentability';
+  search_time_ms: number;
+}
+
+export interface PatentIdResultItem {
+  doc_number: string;
+  title: string;
+  abstract: string;
+  classification: string;
+  publication_date: string;
+  similarity_score: number;
+  matched_claims: string[];
+  all_claims: string[];
+  detailed_description: string;
+}
+
+export interface SourcePatentInfo {
+  doc_number: string;
+  title: string;
+  abstract: string;
+  classification: string;
+  publication_date: string;
+  claims: string[];
+}
+
+export interface PatentIdSearchResponse {
+  success: boolean;
+  source_patent: SourcePatentInfo | null;
+  total: number;
+  results: PatentIdResultItem[];
+  scenario: 'patent_id';
+  search_time_ms: number;
 }
 
 export interface StatsResponse {
@@ -112,7 +155,7 @@ export interface StatsResponse {
 }
 
 // ============================================================================
-// API 函数 - 按场景区分
+// API Functions - By Scenario
 // ============================================================================
 
 export const searchInvalidity = async (
@@ -145,6 +188,16 @@ export const searchPatentability = async (
   return response.data;
 };
 
+export const searchByPatentId = async (
+  request: PatentIdSearchRequest
+): Promise<PatentIdSearchResponse> => {
+  const response = await axios.post<PatentIdSearchResponse>(
+    `${API_BASE}/search/by-patent-id`,
+    request
+  );
+  return response.data;
+};
+
 export const getStats = async (): Promise<StatsResponse> => {
   const response = await axios.get<StatsResponse>(`${API_BASE}/stats`);
   return response.data;
@@ -156,5 +209,24 @@ export const healthCheck = async (): Promise<boolean> => {
     return response.data.status === 'healthy';
   } catch {
     return false;
+  }
+};
+
+// Get a single patent by document number
+export interface PatentInfo {
+  doc_number: string;
+  title: string;
+  abstract: string;
+  classification: string;
+  publication_date: string;
+  claims: string[];
+}
+
+export const getPatentById = async (docNumber: string): Promise<PatentInfo | null> => {
+  try {
+    const response = await axios.get<PatentInfo>(`${API_BASE}/patent/${docNumber}`);
+    return response.data;
+  } catch {
+    return null;
   }
 };

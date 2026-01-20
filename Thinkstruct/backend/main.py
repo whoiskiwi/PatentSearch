@@ -12,6 +12,7 @@ from .routers import (
     invalidity_router,
     infringement_router,
     patentability_router,
+    patent_id_router,
     stats_router
 )
 
@@ -47,6 +48,7 @@ app.add_middleware(
 app.include_router(invalidity_router)
 app.include_router(infringement_router)
 app.include_router(patentability_router)
+app.include_router(patent_id_router)
 app.include_router(stats_router)
 
 
@@ -64,6 +66,7 @@ async def root():
             "invalidity_search": "POST /api/search/invalidity",
             "infringement_search": "POST /api/search/infringement",
             "patentability_search": "POST /api/search/patentability",
+            "patent_id_search": "POST /api/search/by-patent-id",
             "stats": "GET /api/stats",
             "health": "GET /api/health"
         }

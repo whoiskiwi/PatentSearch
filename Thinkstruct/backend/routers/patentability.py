@@ -2,6 +2,7 @@
 Patentability Review Router
 """
 
+import time
 from fastapi import APIRouter, HTTPException, Depends
 
 from ..models import (
@@ -18,11 +19,14 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 async def patentability_search(request: PatentabilitySearchRequest, engine=Depends(get_engine)):
     """Patentability review - Evaluate patentability of new invention"""
     try:
+        start_time = time.perf_counter()
+
         results = engine.patentability_search(
             invention_description=request.invention_description,
             draft_claims=request.draft_claims,
             classification=request.classification,
             keywords=request.keywords,
+            title_search=request.title_search,
             top_k=request.top_k
         )
 
@@ -45,10 +49,13 @@ async def patentability_search(request: PatentabilitySearchRequest, engine=Depen
             for r in results
         ]
 
+        search_time_ms = (time.perf_counter() - start_time) * 1000
+
         return PatentabilitySearchResponse(
             success=True,
             total=len(result_items),
-            results=result_items
+            results=result_items,
+            search_time_ms=round(search_time_ms, 2)
         )
 
     except Exception as e:

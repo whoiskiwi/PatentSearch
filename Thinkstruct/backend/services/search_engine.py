@@ -75,6 +75,20 @@ class PatentabilityResult:
     detailed_description: str = ""
 
 
+@dataclass
+class PatentIdSearchResult:
+    """Patent ID search result"""
+    doc_number: str
+    title: str
+    abstract: str
+    classification: str
+    publication_date: str
+    similarity_score: float
+    matched_claims: list[str] = field(default_factory=list)
+    all_claims: list[str] = field(default_factory=list)
+    detailed_description: str = ""
+
+
 # ============================================================================
 # Search Engine Core Class
 # ============================================================================
@@ -106,6 +120,25 @@ class PatentSearchEngine:
         with open(self.data_path, 'r', encoding='utf-8') as f:
             self.patents = json.load(f)
         logger.info(f"Load complete: {len(self.patents)} patent records")
+        # Build doc_number index for fast lookup
+        self._doc_index = {p["doc_number"]: i for i, p in enumerate(self.patents)}
+
+    def get_patent_by_id(self, doc_number: str) -> Optional[dict]:
+        """Get patent by document number"""
+        # Normalize doc_number (remove prefix like US, spaces, etc.)
+        normalized = doc_number.strip().upper().replace("US", "").replace("-", "").replace(" ", "")
+
+        # Try exact match first
+        if doc_number in self._doc_index:
+            return self.patents[self._doc_index[doc_number]]
+
+        # Try normalized match
+        for patent in self.patents:
+            patent_num = patent["doc_number"].upper().replace("US", "").replace("-", "").replace(" ", "")
+            if patent_num == normalized or patent["doc_number"] == doc_number:
+                return patent
+
+        return None
 
     def _load_model(self) -> None:
         """Lazy load semantic search model"""
@@ -278,6 +311,38 @@ class PatentSearchEngine:
 
         return filtered
 
+    def _filter_by_keywords(self, candidates: list[tuple[int, float]], keywords: list[str]) -> list[tuple[int, float]]:
+        """Filter by keywords in title, abstract, or claims"""
+        if not keywords:
+            return candidates
+
+        filtered = []
+        for idx, score in candidates:
+            patent = self.patents[idx]
+            # Combine searchable text fields
+            searchable_text = (
+                patent.get("title", "") + " " +
+                patent.get("abstract", "") + " " +
+                " ".join(patent.get("claims", []))
+            ).lower()
+
+            # Check if all keywords are present (AND logic)
+            if all(kw.lower() in searchable_text for kw in keywords):
+                filtered.append((idx, score))
+
+        return filtered
+
+    def _filter_by_title(self, candidates: list[tuple[int, float]], title_query: str) -> list[tuple[int, float]]:
+        """Filter by title (case-insensitive substring match)"""
+        if not title_query:
+            return candidates
+
+        title_query_lower = title_query.lower().strip()
+        return [
+            (idx, score) for idx, score in candidates
+            if title_query_lower in self.patents[idx].get("title", "").lower()
+        ]
+
     # ========================================================================
     # Scenario-based Search APIs
     # ========================================================================
@@ -287,6 +352,8 @@ class PatentSearchEngine:
         query_claims: str,
         query_doc_number: str = "",
         classification: str = "",
+        keywords: list[str] = None,
+        title_search: str = "",
         target_date: Optional[str] = None,
         top_k: int = 20
     ) -> list[InvalidityResult]:
@@ -295,6 +362,8 @@ class PatentSearchEngine:
 
         candidates = self._compute_similarity(query_claims, top_k=100)
         candidates = self._filter_by_classification(candidates, classification)
+        candidates = self._filter_by_keywords(candidates, keywords or [])
+        candidates = self._filter_by_title(candidates, title_search)
 
         if target_date:
             candidates = self._filter_by_date(candidates, None, target_date)
@@ -328,6 +397,7 @@ class PatentSearchEngine:
         my_doc_number: str,
         classification: str = "",
         keywords: list[str] = None,
+        title_search: str = "",
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         min_similarity: float = 0.5,
@@ -340,6 +410,8 @@ class PatentSearchEngine:
         candidates = self._compute_similarity(my_claims, top_k=100)
         candidates = self._filter_by_classification(candidates, classification)
         candidates = self._filter_by_date(candidates, date_from, date_to)
+        candidates = self._filter_by_keywords(candidates, keywords or [])
+        candidates = self._filter_by_title(candidates, title_search)
         candidates = [(idx, score) for idx, score in candidates if score >= min_similarity]
 
         results = []
@@ -376,6 +448,7 @@ class PatentSearchEngine:
         draft_claims: str = "",
         classification: str = "",
         keywords: list[str] = None,
+        title_search: str = "",
         top_k: int = 20
     ) -> list[PatentabilityResult]:
         """Patentability review: Evaluate patentability of new invention"""
@@ -387,6 +460,8 @@ class PatentSearchEngine:
 
         candidates = self._compute_similarity(query, top_k=100)
         candidates = self._filter_by_classification(candidates, classification)
+        candidates = self._filter_by_keywords(candidates, keywords or [])
+        candidates = self._filter_by_title(candidates, title_search)
 
         results = []
         for i, (idx, score) in enumerate(candidates[:top_k]):
@@ -412,6 +487,60 @@ class PatentSearchEngine:
 
         logger.info(f"Patentability review complete: {len(results)} results returned")
         return results
+
+    def search_by_patent_id(
+        self,
+        doc_number: str,
+        classification: str = "",
+        top_k: int = 20
+    ) -> tuple[Optional[dict], list[PatentIdSearchResult]]:
+        """Search similar patents using a patent ID as input
+
+        Returns:
+            tuple: (source_patent, similar_patents)
+            - source_patent: The patent matching the doc_number, or None if not found
+            - similar_patents: List of similar patents found
+        """
+        logger.info(f"Executing patent ID search: doc_number={doc_number}")
+
+        # Find the source patent
+        source_patent = self.get_patent_by_id(doc_number)
+        if source_patent is None:
+            logger.warning(f"Patent not found: {doc_number}")
+            return None, []
+
+        # Build query from source patent's claims and abstract
+        claims_text = " ".join(source_patent.get("claims", [])[:5])
+        query = f"{source_patent['abstract']} {claims_text}"
+
+        # Search for similar patents
+        candidates = self._compute_similarity(query, top_k=100)
+        candidates = self._filter_by_classification(candidates, classification)
+
+        # Exclude the source patent itself
+        source_idx = self._doc_index.get(source_patent["doc_number"])
+        candidates = [(idx, score) for idx, score in candidates if idx != source_idx]
+
+        results = []
+        for idx, score in candidates[:top_k]:
+            patent = self.patents[idx]
+            claims = patent.get("claims", [])
+
+            result = PatentIdSearchResult(
+                doc_number=patent["doc_number"],
+                title=patent["title"],
+                abstract=patent["abstract"],
+                classification=patent["classification"],
+                publication_date=patent["publication_date"],
+                similarity_score=round(score, 4),
+                matched_claims=self._find_matched_claims(query, claims),
+                all_claims=claims[:10],
+                detailed_description=patent.get("detailed_description", "")[:500]
+            )
+            results.append(result)
+
+        logger.info(f"Patent ID search complete: {len(results)} results returned")
+        return source_patent, results
 
 
 # ============================================================================

@@ -1,4 +1,4 @@
-/* 表单组 */
+/* Form Groups */
 .form-group {
   margin-bottom: 15px;
 }
@@ -55,4 +55,11 @@
 .date-inputs span {
   color: #666;
   font-size: 0.85rem;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #888;
 }

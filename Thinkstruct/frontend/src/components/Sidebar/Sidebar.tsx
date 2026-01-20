@@ -7,6 +7,8 @@ import './Sidebar.css';
 interface SidebarProps {
   scenario: Scenario;
   onScenarioChange: (scenario: Scenario) => void;
+  usePatentId: boolean;
+  onUsePatentIdChange: (value: boolean) => void;
   apiHealthy: boolean | null;
   stats: StatsResponse | null;
   width: number;
@@ -16,6 +18,8 @@ interface SidebarProps {
   onClassificationChange: (value: string) => void;
   keywords: string;
   onKeywordsChange: (value: string) => void;
+  titleSearch: string;
+  onTitleSearchChange: (value: string) => void;
   topK: number;
   onTopKChange: (value: number) => void;
 }
@@ -23,6 +27,8 @@ interface SidebarProps {
 export function Sidebar({
   scenario,
   onScenarioChange,
+  usePatentId,
+  onUsePatentIdChange,
   apiHealthy,
   stats,
   width,
@@ -31,6 +37,8 @@ export function Sidebar({
   onClassificationChange,
   keywords,
   onKeywordsChange,
+  titleSearch,
+  onTitleSearchChange,
   topK,
   onTopKChange,
 }: SidebarProps) {
@@ -63,6 +71,20 @@ export function Sidebar({
         <p className="scenario-desc">{SCENARIO_INFO[scenario].description}</p>
       </div>
 
+      <div className="quick-search-section">
+        <h3>Quick Search</h3>
+        <button
+          className={`quick-search-btn ${usePatentId ? 'active' : ''}`}
+          onClick={() => onUsePatentIdChange(!usePatentId)}
+        >
+          <span className="toggle-indicator">{usePatentId ? '✓' : ''}</span>
+          <span>Patent ID</span>
+        </button>
+        {usePatentId && (
+          <p className="scenario-desc">Enter a patent number to auto-fetch its content</p>
+        )}
+      </div>
+
       <div className="filters-section">
         <button
           className="filters-toggle"
@@ -83,17 +105,25 @@ export function Sidebar({
               />
             </div>
 
-            {(scenario === 'infringement' || scenario === 'patentability') && (
-              <div className="filter-group">
-                <label>Keywords (comma-separated)</label>
-                <input
-                  type="text"
-                  value={keywords}
-                  onChange={(e) => onKeywordsChange(e.target.value)}
-                  placeholder="e.g. wheel, spoke"
-                />
-              </div>
-            )}
+            <div className="filter-group">
+              <label>Keywords (comma-separated)</label>
+              <input
+                type="text"
+                value={keywords}
+                onChange={(e) => onKeywordsChange(e.target.value)}
+                placeholder="e.g. wheel, spoke"
+              />
+            </div>
+
+            <div className="filter-group">
+              <label>Title Search</label>
+              <input
+                type="text"
+                value={titleSearch}
+                onChange={(e) => onTitleSearchChange(e.target.value)}
+                placeholder="e.g. TIRE PRESSURE MONITORING"
+              />
+            </div>
 
             <div className="filter-group">
               <label>Results: {topK}</label>

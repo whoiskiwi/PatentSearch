@@ -1,4 +1,4 @@
-/* 搜索结果卡片 */
+/* Result Card */
 .result-card {
   background: white;
   padding: 20px;
@@ -79,7 +79,7 @@
   line-height: 1.5;
 }
 
-/* 新颖性标签 */
+/* Novelty Badge */
 .novelty-badges {
   display: flex;
   flex-direction: column;
@@ -104,7 +104,7 @@
   font-weight: 500;
 }
 
-/* 重叠技术特征 */
+/* Overlapping Features */
 .overlapping-features {
   margin-bottom: 15px;
   padding: 12px;
@@ -130,7 +130,7 @@
   margin-bottom: 4px;
 }
 
-/* 关键差异 */
+/* Key Differences */
 .key-differences {
   margin-bottom: 15px;
   padding: 12px;
@@ -156,7 +156,7 @@
   margin-bottom: 4px;
 }
 
-/* 响应式调整 */
+/* Responsive Adjustments */
 @media (max-width: 768px) {
   .result-header {
     flex-direction: column;

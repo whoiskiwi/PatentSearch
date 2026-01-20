@@ -24,15 +24,18 @@ export const SCENARIO_INFO: Record<Scenario, ScenarioInfo> = {
   }
 };
 
-export const EXAMPLE_QUERIES: Record<Scenario, { main: string; secondary?: string }> = {
+export const EXAMPLE_QUERIES: Record<Scenario, { main: string; secondary?: string; patentNumber?: string }> = {
   invalidity: {
     main: 'A vehicle wheel comprising a substrate with a face defining multiple spokes extending radially from a central hub portion',
+    patentNumber: '20240051333'
   },
   infringement: {
     main: 'A tire having retractable studs for driving in icy conditions, the studs being activated by a driver control',
-    secondary: 'US20240001234'
+    secondary: 'US20240001234',
+    patentNumber: '20240051333'
   },
   patentability: {
     main: 'Novel pneumatic tire structure with enhanced durability and reduced rolling resistance using graphene-reinforced rubber compounds',
+    patentNumber: '20240051333'
   }
 };
