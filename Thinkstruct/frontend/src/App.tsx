@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getStats, healthCheck } from './api/searchApi';
 import type { StatsResponse } from './api/searchApi';
+import { saveSearchHistory, type SearchHistoryEntry } from './api/historyApi';
 import type { Scenario } from './types';
 import { SCENARIO_INFO, EXAMPLE_QUERIES } from './types';
 import { useResizableSidebar } from './hooks/useResizableSidebar';
@@ -11,9 +12,11 @@ import {
   type PatentabilityFormData,
   type CommonFilters
 } from './hooks/useSearch';
+import { AuthProvider, useAuth } from './auth';
 import { Sidebar } from './components/Sidebar';
 import { InvalidityForm, InfringementForm, PatentabilityForm } from './components/SearchForm';
 import { InvalidityCard, InfringementCard, PatentabilityCard } from './components/ResultCard';
+import { LoginPage, HistoryPage } from './pages';
 import type { InvalidityResultItem, InfringementResultItem, PatentabilityResultItem } from './api/searchApi';
 import './App.css';
 
@@ -39,7 +42,7 @@ const INITIAL_PATENTABILITY_FORM: PatentabilityFormData = {
   patentNumber: ''
 };
 
-function App() {
+function AppContent() {
   // Scenario state
   const [scenario, setScenario] = useState<Scenario>('patentability');
   const [usePatentId, setUsePatentId] = useState(false);
@@ -61,6 +64,9 @@ function App() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [apiHealthy, setApiHealthy] = useState<boolean | null>(null);
 
+  // Page navigation
+  const [currentPage, setCurrentPage] = useState<'main' | 'history'>('main');
+
   // Custom hooks
   const { width, startResizing } = useResizableSidebar();
   const {
@@ -72,8 +78,12 @@ function App() {
     searchInvalidityPatents,
     searchInfringementPatents,
     searchPatentabilityPatents,
-    clearResults
+    clearResults,
+    restoreFromHistory
   } = useSearch();
+
+  // Auth hook
+  const { isAuthenticated } = useAuth();
 
   // Load stats on mount
   useEffect(() => {
@@ -88,6 +98,44 @@ function App() {
     checkHealth();
   }, []);
 
+  // Save search to history when authenticated and search completes
+  const saveToHistory = useCallback(async () => {
+    if (!isAuthenticated || results.length === 0 || searchTimeMs === null) return;
+
+    let queryData: Record<string, unknown>;
+    switch (scenario) {
+      case 'invalidity':
+        queryData = { ...invalidityForm };
+        break;
+      case 'infringement':
+        queryData = { ...infringementForm };
+        break;
+      case 'patentability':
+        queryData = { ...patentabilityForm };
+        break;
+    }
+
+    try {
+      await saveSearchHistory({
+        scenario,
+        query_data: queryData,
+        results_data: results,
+        result_count: results.length,
+        search_time_ms: searchTimeMs,
+      });
+    } catch (error) {
+      console.error('Failed to save search history:', error);
+    }
+  }, [isAuthenticated, results, searchTimeMs, scenario, invalidityForm, infringementForm, patentabilityForm]);
+
+  // Auto-save to history when results change
+  useEffect(() => {
+    if (results.length > 0 && searchTimeMs !== null) {
+      saveToHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, searchTimeMs]);
+
   // Handle scenario change
   const handleScenarioChange = (newScenario: Scenario) => {
     setScenario(newScenario);
@@ -97,6 +145,59 @@ function App() {
     setInfringementForm(INITIAL_INFRINGEMENT_FORM);
     setPatentabilityForm(INITIAL_PATENTABILITY_FORM);
     setFilters(prev => ({ ...prev, classification: '', keywords: '', titleSearch: '' }));
+  };
+
+  // Handle history selection from HistoryPage - restore results and go back to main
+  const handleSelectHistory = (entry: SearchHistoryEntry) => {
+    const queryData = entry.query_data;
+
+    // Set scenario
+    setScenario(entry.scenario);
+
+    // Restore results from history (instead of clearing)
+    if (entry.results_data && entry.results_data.length > 0) {
+      restoreFromHistory(
+        entry.results_data as import('./hooks/useSearch').SearchResult[],
+        entry.search_time_ms
+      );
+    } else {
+      clearResults();
+    }
+
+    // Populate form based on scenario
+    switch (entry.scenario) {
+      case 'invalidity':
+        setInvalidityForm({
+          queryClaims: (queryData.queryClaims as string) || '',
+          queryDocNumber: (queryData.queryDocNumber as string) || '',
+          targetDate: (queryData.targetDate as string) || '',
+          patentNumber: (queryData.patentNumber as string) || '',
+        });
+        setUsePatentId(!!queryData.patentNumber);
+        break;
+      case 'infringement':
+        setInfringementForm({
+          myClaims: (queryData.myClaims as string) || '',
+          myDocNumber: (queryData.myDocNumber as string) || '',
+          dateFrom: (queryData.dateFrom as string) || '',
+          dateTo: (queryData.dateTo as string) || '',
+          minSimilarity: (queryData.minSimilarity as number) || 0.5,
+          patentNumber: (queryData.patentNumber as string) || '',
+        });
+        setUsePatentId(!!queryData.patentNumber);
+        break;
+      case 'patentability':
+        setPatentabilityForm({
+          inventionDescription: (queryData.inventionDescription as string) || '',
+          draftClaims: (queryData.draftClaims as string) || '',
+          patentNumber: (queryData.patentNumber as string) || '',
+        });
+        setUsePatentId(!!queryData.patentNumber);
+        break;
+    }
+
+    // Navigate back to main page
+    setCurrentPage('main');
   };
 
   // Handle search
@@ -210,6 +311,17 @@ function App() {
     });
   };
 
+  // Render History Page
+  if (currentPage === 'history') {
+    return (
+      <HistoryPage
+        onBack={() => setCurrentPage('main')}
+        onSelectHistory={handleSelectHistory}
+      />
+    );
+  }
+
+  // Render Main Search Page
   return (
     <div className="app">
       <Sidebar
@@ -229,6 +341,7 @@ function App() {
         onTitleSearchChange={(v) => setFilters(prev => ({ ...prev, titleSearch: v }))}
         topK={filters.topK}
         onTopKChange={(v) => setFilters(prev => ({ ...prev, topK: v }))}
+        onNavigateToHistory={() => setCurrentPage('history')}
       />
 
       <main className="main-content">
@@ -294,6 +407,48 @@ function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+function AppWithAuth() {
+  const [showApp, setShowApp] = useState(false);
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Check if user has previously entered the app (guest mode)
+  useEffect(() => {
+    const hasEntered = localStorage.getItem('thinkstruct_entered');
+    if (hasEntered === 'true' || isAuthenticated) {
+      setShowApp(true);
+    }
+  }, [isAuthenticated]);
+
+  const handleEnterApp = () => {
+    localStorage.setItem('thinkstruct_entered', 'true');
+    setShowApp(true);
+  };
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="app-loading">
+        <div className="spinner-large"></div>
+      </div>
+    );
+  }
+
+  // Show login page if not entered
+  if (!showApp) {
+    return <LoginPage onLoginSuccess={handleEnterApp} />;
+  }
+
+  return <AppContent />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppWithAuth />
+    </AuthProvider>
   );
 }
 

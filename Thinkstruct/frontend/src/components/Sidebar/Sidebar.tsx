@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Scenario } from '../../types';
 import { SCENARIO_INFO } from '../../types';
 import type { StatsResponse } from '../../api/searchApi';
+import { useAuth } from '../../auth';
+import { LoginButton, UserMenu } from '../Auth';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -22,6 +24,8 @@ interface SidebarProps {
   onTitleSearchChange: (value: string) => void;
   topK: number;
   onTopKChange: (value: number) => void;
+  // Navigation
+  onNavigateToHistory: () => void;
 }
 
 export function Sidebar({
@@ -41,8 +45,10 @@ export function Sidebar({
   onTitleSearchChange,
   topK,
   onTopKChange,
+  onNavigateToHistory,
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <aside className="sidebar" style={{ width }}>
@@ -51,10 +57,19 @@ export function Sidebar({
         <p>Patent Intelligent Search</p>
       </div>
 
-      <div className="api-status">
-        <span className={`status-dot ${apiHealthy ? 'healthy' : 'unhealthy'}`}></span>
-        <span>{apiHealthy ? 'API Connected' : 'API Disconnected'}</span>
+      {/* Auth Section */}
+      <div className="auth-section">
+        {isLoading ? (
+          <div className="auth-loading">
+            <span className="spinner"></span>
+          </div>
+        ) : isAuthenticated ? (
+          <UserMenu />
+        ) : (
+          <LoginButton />
+        )}
       </div>
+
 
       <div className="scenario-section">
         <h3>Search Scenario</h3>
@@ -139,6 +154,27 @@ export function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Search History Navigation */}
+      <button className="history-nav-btn" onClick={onNavigateToHistory}>
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"
+          />
+        </svg>
+        <span>Search History</span>
+        <svg className="arrow-icon" width="16" height="16" viewBox="0 0 16 16">
+          <path
+            d="M6 4l4 4-4 4"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </svg>
+      </button>
 
       {stats && (
         <div className="stats-section">

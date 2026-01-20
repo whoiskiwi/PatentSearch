@@ -261,6 +261,17 @@ export function useSearch() {
     setSourcePatent(null);
   };
 
+  // Restore results from history entry
+  const restoreFromHistory = (
+    historyResults: SearchResult[],
+    historySearchTimeMs: number
+  ) => {
+    setResults(historyResults);
+    setSearchTimeMs(historySearchTimeMs);
+    setError('');
+    setSourcePatent(null);
+  };
+
   return {
     results,
     loading,
@@ -270,7 +281,8 @@ export function useSearch() {
     searchInvalidityPatents,
     searchInfringementPatents,
     searchPatentabilityPatents,
-    clearResults
+    clearResults,
+    restoreFromHistory
   };
 }
 
