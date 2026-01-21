@@ -1,5 +1,13 @@
 """
 Patentability Review Router
+
+This router handles the patentability review API endpoint.
+Patentability search finds prior art patents that are similar to your
+new invention, helping assess whether it can be patented.
+
+Use case: Evaluate if a new invention is novel enough to patent.
+
+Endpoint: POST /api/search/patentability
 """
 
 import time
@@ -12,15 +20,50 @@ from ..models import (
 )
 from ..dependencies import get_engine
 
+# Create router with prefix and tags for OpenAPI documentation
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 
 @router.post("/patentability", response_model=PatentabilitySearchResponse)
 async def patentability_search(request: PatentabilitySearchRequest, engine=Depends(get_engine)):
-    """Patentability review - Evaluate patentability of new invention"""
+    """
+    Patentability review - Assess if a new invention can be patented.
+
+    This endpoint searches for prior art patents that:
+    1. Are semantically similar to your invention description
+    2. Match any specified classification, keywords, or title filters
+
+    Results include novelty assessment based on similarity scores:
+    - Novel (< 0.6): Likely patentable, low similarity to prior art
+    - Similar (0.6 - 0.75): Moderate similarity, needs differentiation
+    - Identical (>= 0.75): High similarity, patentability concerns
+
+    Lower similarity scores indicate better patentability prospects.
+
+    Args:
+        request: PatentabilitySearchRequest containing:
+            - invention_description: Description of your new invention
+            - draft_claims: Optional draft patent claims
+            - classification: Estimated IPC/CPC code filter
+            - keywords: Core technical terms filter
+            - title_search: Title substring filter
+            - top_k: Maximum results to return
+
+    Returns:
+        PatentabilitySearchResponse containing:
+            - success: Whether search succeeded
+            - total: Number of results
+            - results: List of prior art patents with novelty assessments
+            - search_time_ms: Search execution time
+
+    Raises:
+        HTTPException 500: If search fails
+    """
     try:
+        # Record start time for performance measurement
         start_time = time.perf_counter()
 
+        # Execute the search using the engine
         results = engine.patentability_search(
             invention_description=request.invention_description,
             draft_claims=request.draft_claims,
@@ -30,6 +73,7 @@ async def patentability_search(request: PatentabilitySearchRequest, engine=Depen
             top_k=request.top_k
         )
 
+        # Convert engine results to Pydantic response models
         result_items = [
             PatentabilityResultItem(
                 doc_number=r.doc_number,
@@ -49,6 +93,7 @@ async def patentability_search(request: PatentabilitySearchRequest, engine=Depen
             for r in results
         ]
 
+        # Calculate search time in milliseconds
         search_time_ms = (time.perf_counter() - start_time) * 1000
 
         return PatentabilitySearchResponse(
@@ -59,4 +104,5 @@ async def patentability_search(request: PatentabilitySearchRequest, engine=Depen
         )
 
     except Exception as e:
+        # Return 500 error with exception message
         raise HTTPException(status_code=500, detail=str(e))

@@ -33,7 +33,6 @@ export function Sidebar({
   onScenarioChange,
   usePatentId,
   onUsePatentIdChange,
-  apiHealthy,
   stats,
   width,
   onStartResize,

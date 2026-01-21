@@ -1,16 +1,17 @@
 # Thinkstruct - Patent Intelligent Search System
 
-A semantic search engine for US patents, supporting invalidity search, infringement monitoring, and patentability assessment.
+A semantic search engine for US patents, supporting invalidity search, infringement monitoring, patentability assessment, and patent ID search.
 
 **Last Updated:** January 20, 2026
 
 ## Features
 
 - **Semantic Search**: AI-powered similarity matching using patent-specific NLP models
-- **Three Search Scenarios**:
+- **Four Search Scenarios**:
   - **Invalidity Search**: Find prior art that may invalidate a target patent
   - **Infringement Monitoring**: Monitor new patents for potential infringement risks
   - **Patentability Assessment**: Assess patentability of new inventions
+  - **Patent ID Search**: Find similar patents using a patent document number
 - **Google OAuth Authentication**: Secure login with Google accounts
 - **Search History**: Save and retrieve past searches with full results
 - **Advanced Filtering**: Classification codes (IPC/CPC), keywords, date ranges
@@ -20,24 +21,40 @@ A semantic search engine for US patents, supporting invalidity search, infringem
 ## Tech Stack
 
 ### Backend
-- **Python 3.10+**
-- **FastAPI** - High-performance REST API
-- **Sentence-Transformers** - Semantic embedding generation
-- **NumPy** - Vector similarity computation
+| Technology | Version | Description |
+|------------|---------|-------------|
+| Python | 3.10+ | Programming language |
+| FastAPI | 0.104+ | High-performance REST API framework |
+| Uvicorn | 0.24+ | ASGI server |
+| Sentence-Transformers | 2.2+ | Semantic embedding generation |
+| PyTorch | 2.0+ | Deep learning framework |
+| NumPy | 1.24+ | Vector similarity computation |
+| Pydantic | 2.0+ | Data validation |
 
 ### Database
-- **PostgreSQL** - Production database for user data and search history
-- **SQLite** - Development database (optional)
-- **Redis** - Session caching (optional, recommended for production)
+| Technology | Version | Description |
+|------------|---------|-------------|
+| PostgreSQL | 14+ | Production database (recommended) |
+| SQLite | - | Development database (no setup required) |
+| Redis | 5.0+ | Session caching (optional) |
+| asyncpg | 0.29+ | PostgreSQL async driver |
+| aiosqlite | 0.19+ | SQLite async driver |
 
 ### Frontend
-- **React 18** + TypeScript
-- **Vite** - Build tool
-- **Axios** - HTTP client
+| Technology | Version | Description |
+|------------|---------|-------------|
+| React | 19.2+ | UI framework |
+| TypeScript | 5.9+ | Type-safe JavaScript |
+| Vite | 7.2+ | Build tool and dev server |
+| Axios | 1.13+ | HTTP client |
+| ESLint | 9.39+ | Code linting |
 
 ### Authentication
-- **Google OAuth 2.0** - User authentication
-- **JWT** - Session management
+| Technology | Description |
+|------------|-------------|
+| Google OAuth 2.0 | User authentication via Google |
+| JWT (python-jose) | Session token management |
+| httpx | Async HTTP client for OAuth |
 
 ### Semantic Search Model
 
@@ -51,6 +68,7 @@ PatentSBERTa is a Sentence-BERT model fine-tuned specifically for patent text, t
 | Dimensions | 768 |
 | Max Sequence | 512 tokens |
 | Pooling | Mean Pooling |
+| Model Size | ~420MB |
 
 **Reference Paper:**
 > Bekamiri, H., Hain, D. S., & Jurowetzki, R. (2024).
@@ -69,10 +87,45 @@ PatentSBERTa is a Sentence-BERT model fine-tuned specifically for patent text, t
 ### Backend Setup
 
 ```bash
+# Clone the repository
+cd Thinkstruct
+
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install Python dependencies
 pip install -r requirements.txt
 
-# The model (~420MB) will be downloaded automatically on first run
+# The PatentSBERTa model (~420MB) will be downloaded automatically on first run
+```
+
+#### Python Dependencies (requirements.txt)
+
+```
+# Backend API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# NLP & Machine Learning
+sentence-transformers>=2.2.0
+torch>=2.0.0
+numpy>=1.24.0
+
+# Utilities
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+httpx>=0.27.0
+
+# Database
+asyncpg>=0.29.0
+aiosqlite>=0.19.0
+
+# Cache
+redis>=5.0.0
 ```
 
 ### Database Setup
@@ -123,7 +176,16 @@ GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/callback/google
 
 ```bash
 cd frontend
+
+# Install Node.js dependencies
 npm install
+
+# Dependencies installed:
+# - react@19.2.0
+# - react-dom@19.2.0
+# - axios@1.13.2
+# - typescript@5.9.3
+# - vite@7.2.4
 ```
 
 ## Environment Variables
@@ -194,6 +256,7 @@ npm run dev
 ```bash
 cd frontend
 npm run build
+# Output in frontend/dist/
 ```
 
 ## API Endpoints
@@ -203,10 +266,12 @@ npm run build
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/stats` | Get patent statistics |
+| GET | `/api/stats` | Get patent database statistics |
+| GET | `/api/patent/{doc_number}` | Get single patent by ID |
 | POST | `/api/search/invalidity` | Invalidity search - find prior art |
 | POST | `/api/search/infringement` | Infringement monitoring - detect risks |
 | POST | `/api/search/patentability` | Patentability assessment - evaluate novelty |
+| POST | `/api/search/by-patent-id` | Patent ID search - find similar patents |
 
 ### Authentication APIs
 
@@ -215,12 +280,14 @@ npm run build
 | GET | `/api/auth/login/google` | Initiate Google OAuth login |
 | GET | `/api/auth/callback/google` | OAuth callback handler |
 | GET | `/api/auth/status` | Check authentication status |
+| GET | `/api/auth/me` | Get current user info |
 | POST | `/api/auth/logout` | Logout current user |
 
 ### Search History APIs
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| POST | `/api/history` | Save search to history |
 | GET | `/api/history` | Get user's search history |
 | GET | `/api/history/{id}` | Get specific history entry |
 | DELETE | `/api/history/{id}` | Delete history entry |
@@ -332,6 +399,32 @@ POST /api/search/patentability
 
 ---
 
+### 4. Patent ID Search
+
+Find similar patents using a patent document number as input.
+
+**Request:**
+```json
+POST /api/search/by-patent-id
+{
+  "doc_number": "US20240217263A1",
+  "classification": "B60C",
+  "top_k": 20
+}
+```
+
+**Response Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | bool | Whether patent was found |
+| `source_patent` | object | Information about the query patent |
+| `results` | list | Similar patents found |
+| `similarity_score` | float | Semantic similarity (0-1) |
+| `matched_claims` | list[str] | Claims matching the source patent |
+| `all_claims` | list[str] | All claims (up to 10) |
+
+---
+
 ## Database Schema
 
 ### Users Table
@@ -380,13 +473,13 @@ Thinkstruct/
 │   ├── __init__.py
 │   ├── main.py                     # FastAPI app entry + CORS config
 │   ├── models.py                   # Pydantic request/response models
-│   ├── dependencies.py             # Dependency injection (search engine instance)
+│   ├── dependencies.py             # Dependency injection (search engine)
 │   ├── auth/                       # Authentication module
 │   │   ├── __init__.py
-│   │   ├── config.py               # Settings and configuration
+│   │   ├── config.py               # Settings from environment
 │   │   ├── database.py             # Database interface (SQLite/PostgreSQL)
 │   │   ├── cache.py                # Redis cache layer
-│   │   ├── models.py               # Auth-related Pydantic models
+│   │   ├── models.py               # Auth Pydantic models
 │   │   ├── jwt_handler.py          # JWT token management
 │   │   ├── oauth.py                # Google OAuth implementation
 │   │   └── dependencies.py         # Auth dependencies
@@ -397,7 +490,8 @@ Thinkstruct/
 │   │   ├── invalidity.py           # POST /api/search/invalidity
 │   │   ├── infringement.py         # POST /api/search/infringement
 │   │   ├── patentability.py        # POST /api/search/patentability
-│   │   └── stats.py                # GET /api/stats, GET /api/health
+│   │   ├── patent_id.py            # POST /api/search/by-patent-id
+│   │   └── stats.py                # GET /api/stats, /api/health
 │   └── services/                   # Business logic layer
 │       ├── __init__.py
 │       └── search_engine.py        # Core search engine
@@ -415,7 +509,7 @@ Thinkstruct/
 │   │   │   ├── Sidebar/
 │   │   │   ├── SearchForm/
 │   │   │   ├── ResultCard/
-│   │   │   └── Auth/               # Auth components (LoginButton, UserMenu)
+│   │   │   └── Auth/               # Auth components
 │   │   ├── pages/                  # Page components
 │   │   │   ├── LoginPage.tsx
 │   │   │   ├── HistoryPage.tsx
@@ -437,9 +531,12 @@ Thinkstruct/
 │   ├── __init__.py
 │   ├── clean_patent_data.py        # Data cleaning script
 │   ├── patent_data_small/          # Raw patent data
-│   └── cleaned_output/             # Cleaned data + reports
+│   └── cleaned_output/             # Cleaned data + embeddings
+│       ├── cleaned_patents_*.json  # Cleaned patent data
+│       └── embeddings.npy          # Pre-computed embeddings
 │
 ├── docs/                           # Documentation
+│   ├── semantic_model_guide.md     # Model and performance guide
 │   ├── advanced_features.md        # Advanced features roadmap
 │   └── data_cleaning_guide.md      # Data cleaning guide
 │
@@ -449,11 +546,11 @@ Thinkstruct/
 └── README.md
 ```
 
-### Architecture Overview
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (React)                        │
+│                      Frontend (React 19)                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
 │  │   Sidebar   │  │ SearchForm  │  │      ResultCard         │ │
 │  │  (scenario) │  │   (input)   │  │      (results)          │ │
@@ -463,20 +560,21 @@ Thinkstruct/
 │                    │   useSearch   │  (hooks)                   │
 │                    └───────────────┘                           │
 └────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP/JSON
+                             │ HTTP/JSON (Axios)
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Backend (FastAPI)                          │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                      Routers                             │   │
 │  │  /auth  │  /history  │  /invalidity  │  /infringement   │   │
+│  │         │            │  /patentability  │  /by-patent-id │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                            │                                    │
 │         ┌──────────────────┼──────────────────┐                │
 │         ▼                  ▼                  ▼                 │
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐          │
 │  │  AuthModule │   │SearchEngine │   │  Database   │          │
-│  │   (OAuth)   │   │(PatentSBERTa)│   │ (PostgreSQL)│          │
+│  │ (OAuth+JWT) │   │(PatentSBERTa)│   │ (PostgreSQL)│          │
 │  └─────────────┘   └─────────────┘   └─────────────┘          │
 └────────────────────────────┬────────────────────────────────────┘
                              │
@@ -484,10 +582,25 @@ Thinkstruct/
               ▼              ▼              ▼
 ┌─────────────────┐ ┌─────────────┐ ┌─────────────┐
 │   Patent Data   │ │  PostgreSQL │ │    Redis    │
-│  (JSON files)   │ │  (users,    │ │  (cache)    │
-│                 │ │   history)  │ │             │
+│  (JSON + .npy)  │ │  (users,    │ │  (session   │
+│                 │ │   history)  │ │   cache)    │
 └─────────────────┘ └─────────────┘ └─────────────┘
 ```
+
+## Performance Optimization
+
+### Pre-computed Embeddings
+
+Patent embeddings are pre-computed and saved to `embeddings.npy` file to avoid recalculating on every startup:
+
+- **Without pre-computation**: ~56 seconds on first search
+- **With pre-computation**: ~1-2 seconds search time
+
+The embeddings file is automatically generated on first run and reused on subsequent starts.
+
+### Database Connection Pooling
+
+PostgreSQL uses asyncpg with connection pooling (5-20 connections) for better performance under load.
 
 ## Data Preprocessing
 
@@ -511,8 +624,33 @@ See [Data Cleaning Guide](docs/data_cleaning_guide.md) for details.
 
 ## Documentation
 
+- [Search Scenarios Guide](docs/search_scenarios_guide.md) - Why these scenarios, how to use filters effectively
+- [Semantic Model Guide](docs/semantic_model_guide.md) - Model selection and performance optimization
 - [Data Cleaning Guide](docs/data_cleaning_guide.md) - Data preprocessing documentation
 - [Advanced Features](docs/advanced_features.md) - Future features roadmap
+
+## Quick Start
+
+```bash
+# 1. Setup backend
+pip install -r requirements.txt
+
+# 2. Setup database (PostgreSQL)
+createdb thinkstruct
+
+# 3. Configure environment (create .env file with settings above)
+
+# 4. Start backend
+python run.py
+
+# 5. Setup frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+
+# 6. Open browser
+# http://localhost:3000
+```
 
 ## License
 
