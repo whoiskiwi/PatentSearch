@@ -2,7 +2,7 @@
 
 A semantic search engine for US patents, supporting invalidity search, infringement monitoring, patentability assessment, and patent ID search.
 
-**Last Updated:** January 21, 2026
+**Last Updated:** January 20, 2026
 
 ## Features
 
